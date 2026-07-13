@@ -117,7 +117,8 @@ svg{ display:block; }
    ========================================================================== */
 #app{
   position:relative;
-  height:100vh;
+  height:100vh;   /* fallback for browsers without dvh support */
+  height:100dvh;  /* actual visible viewport — accounts for the address bar */
   max-width:560px;
   margin:0 auto;
   display:flex;
