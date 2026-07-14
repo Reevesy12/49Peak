@@ -1349,6 +1349,110 @@ svg{ display:block; }
 .settings-save-hint.is-visible{ opacity:1; }
 #import-file-input{ display:none; }
 
+/* ==========================================================================
+   STRENGTH SESSION — Today card + picker modal
+   ========================================================================== */
+.strength-card-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:var(--space-3);
+  margin-bottom:var(--space-2);
+}
+.strength-card-eyebrow{
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--text-faint);
+}
+.strength-swap-link{
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--accent-dim);
+  text-decoration:underline;
+  text-underline-offset:2px;
+}
+.strength-rest-note{
+  font-size:13px;
+  color:var(--text-dim);
+  line-height:1.5;
+  margin-bottom:var(--space-3);
+}
+.strength-session-header{ margin-bottom:var(--space-3); }
+.strength-session-title{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:16px;
+  color:var(--text);
+}
+.strength-session-focus{
+  font-size:12px;
+  color:var(--text-dim);
+  margin-top:2px;
+}
+.strength-block{ margin-bottom:var(--space-3); }
+.strength-block:last-child{ margin-bottom:0; }
+.strength-block-head{
+  display:flex;
+  justify-content:space-between;
+  font-family:var(--font-mono);
+  font-size:10.5px;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:var(--accent-dim);
+  margin-bottom:6px;
+}
+.strength-block-duration{ color:var(--text-faint); }
+.strength-block-list{
+  list-style:none;
+  padding:0;
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.strength-block-list li{
+  font-size:13.5px;
+  color:var(--text);
+  line-height:1.4;
+  padding-left:14px;
+  position:relative;
+}
+.strength-block-list li::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:7px;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:var(--accent);
+}
+.strength-tabs{
+  display:flex;
+  gap:8px;
+  margin-bottom:var(--space-4);
+}
+.strength-tab{
+  flex:1 1 0;
+  min-height:40px;
+  border-radius:var(--radius-sm);
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  font-size:13px;
+  font-weight:600;
+  color:var(--text-dim);
+}
+.strength-tab.is-active{ background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.strength-equipment-note{
+  font-family:var(--font-mono);
+  font-size:10.5px;
+  color:var(--text-faint);
+  margin-bottom:var(--space-4);
+  line-height:1.5;
+}
+
 </style>
 </head>
 <body>
@@ -1406,6 +1510,11 @@ svg{ display:block; }
       <div class="card task-card anim-rise" style="--d:60ms" id="task-card">
         <div class="card-title">Required Today</div>
         <div class="task-list" id="task-list"><!-- populated by Today.renderTasks --></div>
+      </div>
+
+      <div class="section-label">Strength Session</div>
+      <div class="card anim-rise" style="--d:85ms; margin-bottom:var(--space-5);" id="strength-card">
+        <!-- populated by Today.renderStrength -->
       </div>
 
       <div class="section-label">Today's Notes</div>
@@ -1889,7 +1998,9 @@ svg{ display:block; }
           stepsCount: CONFIG.targets.stepsCount
         },
         // Monday=0 .. Sunday=6, per the final specification's recurring schedule
-        trainingSchedule: ["Strength", "Bike", "Strength", "Recovery / Walk", "Strength", "Long Ride", "Family Walk"]
+        trainingSchedule: ["Strength", "Bike", "Strength", "Recovery / Walk", "Strength", "Long Ride", "Family Walk"],
+        // which of the 3 rotating strength sessions (0=A,1=B,2=C) comes up next
+        strengthRotationIndex: 0
       },
       entries: {},      // keyed by ISO date -> { tasks:{taskId:bool}, notes:"", notesUpdatedAt:null }
       weighIns: [],      // legacy/reserved — superseded by healthEntries type "weight"
@@ -1917,6 +2028,7 @@ svg{ display:block; }
       delete state.settings.targets.waterL;
       delete state.settings.targets.sleepHours;
       if (!state.settings.trainingSchedule) state.settings.trainingSchedule = DEFAULT_STATE.settings.trainingSchedule.slice();
+      if (typeof state.settings.strengthRotationIndex !== "number") state.settings.strengthRotationIndex = 0;
       if (!state.mission) state.mission = JSON.parse(JSON.stringify(DEFAULT_STATE.mission));
 
       // One-time cleanup: remove any previously-logged entries of the retired types.
@@ -2015,6 +2127,17 @@ svg{ display:block; }
         this.update({ settings: Object.assign({}, state.settings, { trainingSchedule: schedule.slice() }) });
       },
 
+      /** Index (0/1/2) of the strength session that comes up next in the A/B/C rotation. */
+      getStrengthRotationIndex(){
+        return state.settings.strengthRotationIndex || 0;
+      },
+
+      /** Advances the rotation to start from the session *after* the one just completed. */
+      advanceStrengthRotationFrom(completedIndex){
+        const next = (completedIndex + 1) % 3;
+        this.update({ settings: Object.assign({}, state.settings, { strengthRotationIndex: next }) });
+      },
+
       /** Wipes all persisted data back to defaults (used by Settings > Clear Data). */
       resetAll(){
         state = JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -2036,6 +2159,7 @@ svg{ display:block; }
         delete state.settings.targets.sleepHours;
         delete state.settings.fastingWindow;
         if (!state.settings.trainingSchedule) state.settings.trainingSchedule = DEFAULT_STATE.settings.trainingSchedule;
+        if (typeof state.settings.strengthRotationIndex !== "number") state.settings.strengthRotationIndex = 0;
         if (!state.mission) state.mission = DEFAULT_STATE.mission;
         Object.keys(state.healthEntries).forEach(function(id){
           if (RETIRED_ENTRY_TYPES.indexOf(state.healthEntries[id].type) !== -1) delete state.healthEntries[id];
@@ -2160,6 +2284,122 @@ svg{ display:block; }
       const t = (this.getDayNumber(date) - 1) / (this.getTotalDays() - 1);
       const w = m.startWeightKg + (m.goalWeightKg - m.startWeightKg) * t;
       return Math.round(w * 10) / 10;
+    }
+  };
+
+  /* ------------------------------------------------------------------------
+     RULE ENGINE — pure, JS-only business rules. Owns two things: (1) which
+  /* ------------------------------------------------------------------------
+     STRENGTH PROGRAM — three rotating ~45-minute sessions built around the
+     equipment on hand (20kg total dumbbells, TRX, skipping rope, carpeted
+     floor). Designed for the fat-loss goal specifically: full-body circuits
+     that combine resistance work with rope-based conditioning, rather than
+     a slow heavy-lifting split. Pure data + a couple of pure render
+     helpers — no page owns this; Today mounts it, but any page could.
+     ------------------------------------------------------------------------ */
+  const StrengthProgram = {
+    equipmentNote: "Built around dumbbells (20kg total), TRX, a skipping rope and floor space — no other equipment assumed.",
+
+    SESSIONS: [
+      {
+        id: "A",
+        title: "Full-Body Strength Circuit",
+        focus: "Compound strength + steady conditioning",
+        blocks: [
+          { label: "Warm-up", duration: "5 min", items: [
+            "Skipping rope — 2 min easy pace",
+            "Arm circles — 20 each direction",
+            "Bodyweight squats — 15 reps"
+          ]},
+          { label: "Main circuit — 4 rounds, 60s rest between rounds", duration: "30 min", items: [
+            "Dumbbell goblet squats — 15 reps",
+            "TRX rows — 12 reps",
+            "Dumbbell shoulder press — 12 reps",
+            "TRX chest press — 12 reps",
+            "Dumbbell Romanian deadlifts — 12 reps",
+            "Skipping rope — 1 min"
+          ]},
+          { label: "Finisher", duration: "5 min", items: [
+            "Plank hold — 3 x 30s",
+            "TRX mountain climbers — 20 reps"
+          ]},
+          { label: "Cooldown", duration: "5 min", items: [
+            "Full-body stretch — hips, shoulders, hamstrings"
+          ]}
+        ]
+      },
+      {
+        id: "B",
+        title: "Strength + Conditioning Intervals",
+        focus: "Higher heart-rate, interval-driven",
+        blocks: [
+          { label: "Warm-up", duration: "5 min", items: [
+            "Bodyweight lunges — 10 per leg",
+            "Dynamic hip and shoulder stretches"
+          ]},
+          { label: "Main circuit — 5 rounds, 45s rest between rounds", duration: "30 min", items: [
+            "Skipping rope — 90s fast pace",
+            "Dumbbell renegade rows — 10 per side",
+            "TRX squat to row — 12 reps",
+            "Dumbbell walking lunges — 10 per leg",
+            "TRX tricep press — 12 reps"
+          ]},
+          { label: "Finisher", duration: "5 min", items: [
+            "TRX knee tucks — 15 reps",
+            "Dumbbell Russian twists — 20 reps"
+          ]},
+          { label: "Cooldown", duration: "5 min", items: [
+            "Full-body stretch — focus on hip flexors and lats"
+          ]}
+        ]
+      },
+      {
+        id: "C",
+        title: "Posterior Chain & Core",
+        focus: "Glutes, hamstrings, back and core",
+        blocks: [
+          { label: "Warm-up", duration: "5 min", items: [
+            "Skipping rope — 2 min easy pace",
+            "Glute bridges — 15 reps",
+            "Hip circles — 10 each direction"
+          ]},
+          { label: "Main circuit — 4 rounds, 60s rest between rounds", duration: "30 min", items: [
+            "Dumbbell Romanian deadlifts — 15 reps",
+            "TRX hamstring curls — 12 reps",
+            "Dumbbell bent-over rows — 12 reps",
+            "TRX face pulls — 15 reps",
+            "Dumbbell single-arm overhead press — 10 per side",
+            "Skipping rope — 1 min"
+          ]},
+          { label: "Finisher", duration: "5 min", items: [
+            "Side plank — 30s per side",
+            "TRX ab fallouts — 12 reps"
+          ]},
+          { label: "Cooldown", duration: "5 min", items: [
+            "Full-body stretch — focus on lower back and glutes"
+          ]}
+        ]
+      }
+    ],
+
+    get(id){ return this.SESSIONS.find(s => s.id === id) || this.SESSIONS[0]; },
+
+    /** Renders one session's full detail (used both inline on Today and in the picker modal). */
+    renderSessionHTML(session){
+      return (
+        '<div class="strength-session-header">' +
+          '<div class="strength-session-title">' + session.title + '</div>' +
+          '<div class="strength-session-focus">' + session.focus + '</div>' +
+        '</div>' +
+        session.blocks.map(function(block){
+          return (
+            '<div class="strength-block">' +
+              '<div class="strength-block-head"><span>' + block.label + '</span><span class="strength-block-duration">' + block.duration + '</span></div>' +
+              '<ul class="strength-block-list">' + block.items.map(function(item){ return '<li>' + item + '</li>'; }).join("") + '</ul>' +
+            '</div>'
+          );
+        }).join("")
+      );
     }
   };
 
@@ -3844,7 +4084,8 @@ svg{ display:block; }
         ringValue:    Utilities.qs("#summary-ring-value"),
         summaryTitle: Utilities.qs("#summary-copy-title"),
         summaryBody:  Utilities.qs("#summary-copy-body"),
-        headerMeta:   Utilities.qs("#header-meta")
+        headerMeta:   Utilities.qs("#header-meta"),
+        strengthCard: Utilities.qs("#strength-card")
       };
     }
 
@@ -3927,6 +4168,87 @@ svg{ display:block; }
       renderScore();
     }
 
+    function renderStrength(){
+      if (!els.strengthCard) return;
+      const now = new Date();
+      const scheduledType = RuleEngine.getTrainingForDate(now);
+      const isScheduledStrengthDay = /strength/i.test(scheduledType);
+      const rotationIndex = Data.getStrengthRotationIndex();
+      const session = StrengthProgram.SESSIONS[rotationIndex];
+      const alreadyDone = !!(Data.getEntry(todayISO).tasks || {}).training;
+
+      const headHTML =
+        '<div class="strength-card-head">' +
+          '<span class="strength-card-eyebrow">' + (isScheduledStrengthDay ? "Today's Session" : "Scheduled: " + scheduledType) + '</span>' +
+          '<button class="strength-swap-link tappable" id="strength-swap-btn" type="button">Switch session</button>' +
+        '</div>';
+
+      let bodyHTML;
+      if (isScheduledStrengthDay || els._strengthOverride){
+        const shown = els._strengthOverride || session;
+        bodyHTML =
+          StrengthProgram.renderSessionHTML(shown) +
+          '<button class="btn btn-primary btn-block tappable" id="strength-complete-btn" type="button" style="margin-top:var(--space-4);">' +
+            (alreadyDone ? "Session Logged \u2713" : "Mark Session Complete") +
+          '</button>';
+      } else {
+        bodyHTML =
+          '<p class="strength-rest-note">Today\u2019s plan is ' + scheduledType.toLowerCase() + ', not a scheduled strength day. If you\u2019re swapping — went for a run on a strength day, say — pull up a session anyway.</p>' +
+          '<button class="btn btn-secondary btn-block tappable" id="strength-anyway-btn" type="button">Do a Strength Session Anyway</button>';
+      }
+
+      els.strengthCard.innerHTML = headHTML + bodyHTML;
+
+      Utilities.on(Utilities.qs("#strength-swap-btn"), "click", openStrengthPicker);
+      const anywayBtn = Utilities.qs("#strength-anyway-btn");
+      if (anywayBtn) Utilities.on(anywayBtn, "click", function(){ els._strengthOverride = session; renderStrength(); });
+      const completeBtn = Utilities.qs("#strength-complete-btn");
+      if (completeBtn) Utilities.on(completeBtn, "click", function(){ markStrengthSessionComplete(els._strengthOverride || session); });
+    }
+
+    function openStrengthPicker(){
+      const tabsHTML = '<div class="strength-tabs">' + StrengthProgram.SESSIONS.map(function(s, i){
+        return '<button class="strength-tab' + (i === 0 ? " is-active" : "") + '" data-idx="' + i + '" type="button">Session ' + s.id + '</button>';
+      }).join("") + '</div>';
+
+      Modal.open({
+        title: "Choose a Session",
+        bodyHTML:
+          '<p class="strength-equipment-note">' + StrengthProgram.equipmentNote + '</p>' +
+          tabsHTML +
+          '<div id="strength-picker-detail"></div>',
+        footerHTML: '<button class="btn btn-primary btn-block tappable" id="strength-picker-use-btn" type="button">Use This Session Today</button>',
+        onMount(){
+          let selected = 0;
+          function renderDetail(){
+            Utilities.qs("#strength-picker-detail").innerHTML = StrengthProgram.renderSessionHTML(StrengthProgram.SESSIONS[selected]);
+          }
+          Utilities.qsa(".strength-tab").forEach(function(tab){
+            Utilities.on(tab, "click", function(){
+              selected = parseInt(tab.getAttribute("data-idx"), 10);
+              Utilities.qsa(".strength-tab").forEach(function(t){ t.classList.toggle("is-active", t === tab); });
+              renderDetail();
+            });
+          });
+          renderDetail();
+          Utilities.on(Utilities.qs("#strength-picker-use-btn"), "click", function(){
+            els._strengthOverride = StrengthProgram.SESSIONS[selected];
+            Modal.close();
+            renderStrength();
+          });
+        }
+      });
+    }
+
+    function markStrengthSessionComplete(session){
+      Data.setTaskState(todayISO, "training", true);
+      const sessionIndex = StrengthProgram.SESSIONS.findIndex(function(s){ return s.id === session.id; });
+      Data.advanceStrengthRotationFrom(sessionIndex === -1 ? 0 : sessionIndex);
+      els._strengthOverride = null;
+      renderTasks();
+      renderStrength();
+    }
+
     function renderScore(){
       const entry = Data.getEntry(todayISO);
       const score = Calculations.getCompletionScore(taskDefs, entry.tasks || {});
@@ -3983,6 +4305,7 @@ svg{ display:block; }
         renderHeaderMeta();
         renderHero();
         renderTasks();
+        renderStrength();
         renderNotes();
         renderQuote();
 
@@ -3997,12 +4320,14 @@ svg{ display:block; }
         const freshToday = Utilities.toISODate(new Date());
         if (freshToday !== todayISO){
           todayISO = freshToday;
+          els._strengthOverride = null;
           renderNotes();
           renderQuote();
         }
         renderHeaderMeta();
         renderHero();
         renderTasks();
+        renderStrength();
       }
     };
   })();
@@ -4130,7 +4455,8 @@ svg{ display:block; }
   window.__49PEAK__ = {
     CONFIG, QUOTES, Utilities, Storage, Data, MissionEngine, RuleEngine,
     Calculations, Charts, Calendar, Dashboard, Settings, Today, App, Progress,
-    EntryTypes, Modal, ConfirmDialog, DataEntry, HealthTimeline, WeeklyReviewView
+    EntryTypes, Modal, ConfirmDialog, DataEntry, HealthTimeline, WeeklyReviewView,
+    StrengthProgram
   };
 
 })();
