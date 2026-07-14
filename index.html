@@ -1296,6 +1296,26 @@ svg{ display:block; }
 .calendar-detail__title{ font-family:var(--font-display); font-weight:600; font-size:14.5px; color:var(--text); margin-bottom:6px; }
 .calendar-detail__row{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-dim); padding:4px 0; border-bottom:1px solid var(--border-soft); }
 .calendar-detail__row:last-child{ border-bottom:0; }
+.calendar-detail__note{
+  margin-top:var(--space-3);
+  padding:var(--space-3);
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  font-size:13px;
+  color:var(--text);
+  line-height:1.5;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.calendar-detail__note-label{
+  font-family:var(--font-mono);
+  font-size:9.5px;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  color:var(--text-faint);
+  margin-bottom:4px;
+}
 .calendar-legend{ display:flex; gap:var(--space-4); margin-bottom:var(--space-5); flex-wrap:wrap; }
 .calendar-legend span{ display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--text-faint); }
 .calendar-legend .dot{ width:6px; height:6px; border-radius:50%; }
@@ -3137,6 +3157,7 @@ svg{ display:block; }
       if (!bound){
         Utilities.on(els.prevBtn, "click", () => { changeMonth(-1); });
         Utilities.on(els.nextBtn, "click", () => { changeMonth(1); });
+        Data.subscribe(() => { const e = cacheEls(); if (e.detail) renderDetail(e); });
         bound = true;
       }
     }
@@ -3172,7 +3193,26 @@ svg{ display:block; }
           rows += '<div class="calendar-detail__row"><span>Mission score</span><span>Upcoming</span></div>';
         }
       }
+
+      // Notes for this day — the Today-page running note and any logged Daily Notes entry are two
+      // separate things, so both are shown here, clearly labelled, if present.
+      const dayEntry = Data.getEntry(iso);
+      const dailyNoteEntry = Data.getHealthEntry("dailyNotes", iso);
+
+      if (dayEntry.notes && dayEntry.notes.trim()){
+        rows += '<div class="calendar-detail__note"><div class="calendar-detail__note-label">Today\u2019s Notes</div>' + dayEntry.notes + '</div>';
+      }
+      if (dailyNoteEntry){
+        rows += '<div class="calendar-detail__note"><div class="calendar-detail__note-label">Daily Note Entry</div>' + dailyNoteEntry.value + '</div>';
+      }
+      if (inMission && iso <= todayISO && !dayEntry.notes && !dailyNoteEntry){
+        rows += '<button class="btn btn-secondary tappable btn-block" id="calendar-add-note-btn" style="margin-top:var(--space-3);" type="button">Add a Note for This Day</button>';
+      }
+
       els.detail.innerHTML = rows;
+
+      const addNoteBtn = Utilities.qs("#calendar-add-note-btn");
+      if (addNoteBtn) Utilities.on(addNoteBtn, "click", function(){ DataEntry.openForm("dailyNotes", iso); });
     }
 
     return {
@@ -3770,9 +3810,9 @@ svg{ display:block; }
     }
 
     /* ---------- step 2: entry form ---------- */
-    function openForm(type){
+    function openForm(type, dateISO){
       currentType = type;
-      currentDate = todayISO();
+      currentDate = dateISO || todayISO();
       loadEntryForDate(type, currentDate);
       renderForm();
     }
