@@ -2713,6 +2713,14 @@ svg{ display:block; }
        PROJECTION ENGINE
        ====================================================================== */
     const Projection = {
+      // Outer physiological sanity bound on the raw observed rate — this
+      // only guards against extreme data-entry errors, it does not do the
+      // real work (see the shrinkage blend below). Note: even a rate that
+      // looks reasonable per-day compounds to an implausible total once
+      // multiplied across 100+ remaining days, so this is deliberately a
+      // sustainable long-horizon figure (~1.4kg/week), not a short-burst one.
+      MAX_DAILY_RATE_KG: 0.2,
+
       getProjection(asOfISO){
         asOfISO = asOfISO || todayISO();
         const w = Weight.getStats(asOfISO);
@@ -2734,8 +2742,23 @@ svg{ display:block; }
           };
         }
 
-        const slope = w.trendSlopeKgPerDay; // kg/day, negative = losing
-        const projectedFinishWeightKg = round1(w.currentWeightKg + slope * timeline.daysRemaining);
+        // A trend from just 2-4 weigh-ins is mostly noise (hydration, food
+        // timing, etc.) — extrapolated across 100+ remaining days that noise
+        // becomes a wildly unrealistic number. Rather than clamp the output
+        // (which throws away real signal once a genuine trend exists), the
+        // observed rate is shrunk toward the mission's own planned rate,
+        // weighted by how many weigh-ins actually support it. At 2 entries
+        // the plan's own pace is used almost entirely; by ~10 entries the
+        // observed trend is trusted in full.
+        const rawSlope = Utilities.clamp(w.trendSlopeKgPerDay, -this.MAX_DAILY_RATE_KG, this.MAX_DAILY_RATE_KG);
+        const planSlope = (m.goalWeightKg - m.startWeightKg) / (timeline.totalDays - 1);
+        const trustInTrend = Utilities.clamp((entryCount - 2) / 8, 0, 1);
+        const slope = trustInTrend * rawSlope + (1 - trustInTrend) * planSlope;
+
+        let projectedFinishWeightKg = round1(w.currentWeightKg + slope * timeline.daysRemaining);
+        // Last-resort net only — catches genuine data-entry errors (e.g. a
+        // stray typo'd weigh-in), not meant to constrain a real result.
+        projectedFinishWeightKg = Utilities.clamp(projectedFinishWeightKg, 30, m.startWeightKg + 30);
 
         let projectedFinishDate = null;
         if (slope < 0){
