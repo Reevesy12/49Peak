@@ -1691,10 +1691,6 @@ svg{ display:block; }
           <div><div class="settings-row__label">Target weight</div></div>
           <input type="number" step="0.1" class="settings-input" id="settings-goal-weight">
         </div>
-        <div class="settings-row">
-          <div><div class="settings-row__label">Step goal</div></div>
-          <input type="number" step="500" class="settings-input" id="settings-step-goal">
-        </div>
         <div class="settings-save-hint" id="goals-save-hint">Saved</div>
       </div>
 
@@ -1800,10 +1796,7 @@ svg{ display:block; }
       startWeightKg: 97,
       goalWeightKg: 85
     }),
-    pages: Object.freeze(["today","progress","calendar","dashboard","settings"]),
-    targets: Object.freeze({
-      stepsCount: 8000
-    })
+    pages: Object.freeze(["today","progress","calendar","dashboard","settings"])
   });
 
   const QUOTES = Object.freeze([
@@ -2014,9 +2007,6 @@ svg{ display:block; }
       settings: {
         activePage: "today",
         units: { weight: "kg", length: "cm", distance: "km" },
-        targets: {
-          stepsCount: CONFIG.targets.stepsCount
-        },
         // Monday=0 .. Sunday=6, per the final specification's recurring schedule
         trainingSchedule: ["Strength", "Bike", "Strength", "Recovery / Walk", "Strength", "Long Ride", "Family Walk"],
         // which of the 3 rotating strength sessions (0=A,1=B,2=C) comes up next
@@ -2042,11 +2032,8 @@ svg{ display:block; }
       if (!state.settings.units) state.settings.units = { weight: "kg", length: "cm", distance: "km" };
       if (!state.settings.units.distance) state.settings.units.distance = "km";
       delete state.settings.units.volume; // retired with Nutrition/Lifestyle tracking
-      if (!state.settings.targets) state.settings.targets = JSON.parse(JSON.stringify(DEFAULT_STATE.settings.targets));
       delete state.settings.fastingWindow; // retired with Nutrition/Lifestyle tracking
-      delete state.settings.targets.proteinG;
-      delete state.settings.targets.waterL;
-      delete state.settings.targets.sleepHours;
+      delete state.settings.targets; // retired with the step goal — no daily targets remain
       if (!state.settings.trainingSchedule) state.settings.trainingSchedule = DEFAULT_STATE.settings.trainingSchedule.slice();
       if (typeof state.settings.strengthRotationIndex !== "number") state.settings.strengthRotationIndex = 0;
       if (!state.mission) state.mission = JSON.parse(JSON.stringify(DEFAULT_STATE.mission));
@@ -2136,12 +2123,6 @@ svg{ display:block; }
         this.update({ mission: Object.assign({}, state.mission, patch) });
       },
 
-      /** Persists a daily-targets patch (currently just the step goal). */
-      setTargets(patch){
-        const targets = Object.assign({}, state.settings.targets, patch);
-        this.update({ settings: Object.assign({}, state.settings, { targets }) });
-      },
-
       /** Replaces the full 7-slot (Mon..Sun) training schedule. */
       setTrainingSchedule(schedule){
         this.update({ settings: Object.assign({}, state.settings, { trainingSchedule: schedule.slice() }) });
@@ -2173,10 +2154,7 @@ svg{ display:block; }
         if (!state.settings) state.settings = DEFAULT_STATE.settings;
         if (!state.settings.units) state.settings.units = DEFAULT_STATE.settings.units;
         delete state.settings.units.volume;
-        if (!state.settings.targets) state.settings.targets = DEFAULT_STATE.settings.targets;
-        delete state.settings.targets.proteinG;
-        delete state.settings.targets.waterL;
-        delete state.settings.targets.sleepHours;
+        delete state.settings.targets; // retired with the step goal — no daily targets remain
         delete state.settings.fastingWindow;
         if (!state.settings.trainingSchedule) state.settings.trainingSchedule = DEFAULT_STATE.settings.trainingSchedule;
         if (typeof state.settings.strengthRotationIndex !== "number") state.settings.strengthRotationIndex = 0;
@@ -2465,15 +2443,13 @@ svg{ display:block; }
     /**
      * Builds today's task list. Each task: { id, label, tag }.
      * `tag` is an optional short badge (e.g. "WEEKLY") shown beside the label.
-     * Labels are generated from the live, Settings-editable targets rather
-     * than hardcoded numbers, so editing a goal in Settings updates Today's
-     * task list immediately.
+     * Labels are generated from the live, Settings-editable schedule rather
+     * than hardcoded, so editing the training schedule in Settings updates
+     * Today's task list immediately.
      */
     getTodaysTasks(date){
-      const targets = Data.get().settings.targets;
       const tasks = [
-        { id: "training",        label: this.getTrainingForDate(date) },
-        { id: "steps-8000",      label: targets.stepsCount.toLocaleString() + " step goal" }
+        { id: "training", label: this.getTrainingForDate(date) }
       ];
       if (this.isWeighInDue(date)){
         tasks.push({ id: "weigh-in", label: "Weigh-in due", tag: "Weekly" });
@@ -3452,13 +3428,11 @@ svg{ display:block; }
 
     _renderGoalInputs(){
       const m = MissionEngine.getConfig();
-      const t = Data.get().settings.targets;
       const setVal = (id, v) => { const el = Utilities.qs(id); if (el && document.activeElement !== el) el.value = v; };
       setVal("#settings-start-date", m.startDate);
       setVal("#settings-end-date", m.endDate);
       setVal("#settings-start-weight", m.startWeightKg);
       setVal("#settings-goal-weight", m.goalWeightKg);
-      setVal("#settings-step-goal", t.stepsCount);
     },
 
     _flashSaved(hintId){
@@ -3484,17 +3458,6 @@ svg{ display:block; }
       bindMission("#settings-end-date", "endDate", false);
       bindMission("#settings-start-weight", "startWeightKg", true);
       bindMission("#settings-goal-weight", "goalWeightKg", true);
-
-      const bindTarget = (id, key) => {
-        const el = Utilities.qs(id);
-        Utilities.on(el, "change", () => {
-          const v = parseFloat(el.value);
-          if (isNaN(v) || v < 0) return;
-          Data.setTargets({ [key]: v });
-          this._flashSaved("#goals-save-hint");
-        });
-      };
-      bindTarget("#settings-step-goal", "stepsCount");
     },
 
     _renderScheduleEditor(){
