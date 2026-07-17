@@ -15,7 +15,7 @@
  * network origin beyond the app's own files.
  */
 
-const CACHE_NAME = "49peak-shell-v7";
+const CACHE_NAME = "49peak-shell-v8";
 const SHELL_FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
