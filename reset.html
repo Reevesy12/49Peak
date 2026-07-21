@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reset — 49Peak</title>
+<style>
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:#0B0E13; color:#E8EAED; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    padding:24px; text-align:center;
+  }
+  .box{max-width:420px;}
+  .brand{font-size:20px; margin-bottom:14px;}
+  .brand span{color:#C9A24B;}
+  p{color:#9096A1; font-size:14px; line-height:1.5;}
+  .status{margin:20px 0; font-weight:600; color:#C9A24B;}
+  a{
+    display:inline-block; margin-top:10px; background:#C9A24B; color:#14110A; text-decoration:none;
+    padding:12px 22px; border-radius:9px; font-weight:700;
+  }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="brand">49<span>PEAK</span> — Reset</div>
+    <p>This clears only the stale cached app files for this one app. Your tracking data lives in the cloud (or on this device if you haven't logged in yet) and is untouched either way.</p>
+    <div class="status" id="status">Working...</div>
+    <a href="./index.html" id="continueLink" style="display:none;">Open the app</a>
+  </div>
+
+<script>
+(async function(){
+  const statusEl = document.getElementById('status');
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const reg of regs) {
+        if (reg.scope.includes(location.pathname.replace(/[^/]*$/, ''))) {
+          await reg.unregister();
+        }
+      }
+    }
+    statusEl.textContent = 'Done. Tap below to open the app fresh.';
+  } catch (err) {
+    statusEl.textContent = 'Something went wrong, but it\'s safe to continue.';
+  }
+  document.getElementById('continueLink').style.display = 'inline-block';
+})();
+</script>
+</body>
+</html>
