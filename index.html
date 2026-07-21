@@ -364,6 +364,36 @@ svg{ display:block; }
 }
 #boot-veil .brand-mark{ font-size:24px; }
 
+/* ---------- LOGIN ---------- */
+#loginScreen{
+  position:fixed; inset:0; z-index:100;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg); padding:24px;
+}
+#loginScreen .login-card{ width:100%; max-width:340px; }
+#loginScreen .brand-mark{ display:block; text-align:center; font-size:22px; margin-bottom:6px; }
+#loginScreen p.login-sub{ text-align:center; color:var(--text-dim); font-size:13px; margin:0 0 26px; }
+.login-field{ margin-bottom:14px; }
+.login-field label{
+  display:block; font-family:var(--font-mono); font-size:11px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--text-faint); margin-bottom:6px;
+}
+.login-input{
+  width:100%; background:var(--surface-2); border:1px solid var(--border);
+  border-radius:var(--radius-sm); color:var(--text); font-family:var(--font-body);
+  font-size:15px; padding:11px 12px;
+}
+#loginError{ color:var(--danger); font-size:12.5px; text-align:center; min-height:16px; margin-top:10px; }
+
+/* ---------- MIGRATION OFFER ---------- */
+#migrationScreen{
+  position:fixed; inset:0; z-index:100;
+  display:none; align-items:center; justify-content:center;
+  background:var(--bg); padding:24px;
+}
+#migrationScreen .login-card{ width:100%; max-width:340px; text-align:center; }
+#migrationScreen p{ color:var(--text-dim); font-size:13.5px; line-height:1.5; margin:0 0 22px; }
+
 /* scrollbar tidy (webkit) */
 .page::-webkit-scrollbar{ width:0; height:0; }
 
@@ -1477,6 +1507,36 @@ svg{ display:block; }
 </head>
 <body>
 
+<div id="loginScreen">
+  <div class="card login-card">
+    <span class="brand-mark">49<span>PEAK</span></span>
+    <p class="login-sub">Sign in to load your mission data.</p>
+    <form id="loginForm">
+      <div class="login-field">
+        <label for="login-email">Email</label>
+        <input type="text" id="login-email" class="login-input" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="login-field" style="position:relative;">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" class="login-input" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" style="padding-right:56px;">
+        <button type="button" id="togglePassword" style="position:absolute;right:6px;bottom:8px;background:none;border:none;color:var(--text-faint);font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;cursor:pointer;padding:6px 8px;">SHOW</button>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="loginSubmitBtn" style="width:100%;">Log in</button>
+      <div id="loginError"></div>
+    </form>
+  </div>
+</div>
+
+<div id="migrationScreen">
+  <div class="card login-card">
+    <span class="brand-mark">49<span>PEAK</span></span>
+    <p id="migrationText">Found existing mission data on this device.</p>
+    <button class="btn btn-primary btn-block" id="migrationGoBtn" style="width:100%;margin-bottom:10px;">Move it to the cloud</button>
+    <button class="btn btn-secondary btn-block" id="migrationSkipBtn" style="width:100%;">Start fresh instead</button>
+    <div id="migrationError" style="color:var(--danger);font-size:12.5px;text-align:center;min-height:16px;margin-top:10px;"></div>
+  </div>
+</div>
+
 <div id="boot-veil"><span class="brand-mark">49<span>PEAK</span></span></div>
 
 <div id="app">
@@ -1772,6 +1832,36 @@ svg{ display:block; }
 
 </div>
 
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, enableIndexedDbPersistence
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAdRRyrj1ZkUZEH4jNoyz9dUfl0zaUTv5w",
+    authDomain: "family-hub-apps-f51ef.firebaseapp.com",
+    projectId: "family-hub-apps-f51ef",
+    storageBucket: "family-hub-apps-f51ef.firebasestorage.app",
+    messagingSenderId: "1038188562420",
+    appId: "1:1038188562420:web:5020cd362f8f1b0aff1ba1"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  enableIndexedDbPersistence(db).catch(() => {});
+
+  window.fb = { auth, db, doc, getDoc, setDoc, signInWithEmailAndPassword, signOut };
+
+  onAuthStateChanged(auth, user => {
+    if (typeof window.onAuthChange === 'function') window.onAuthChange(user);
+    else window.__pendingAuthUser = user;
+  });
+</script>
 <script>
 /* ==========================================================================
    49PEAK — APPLICATION ARCHITECTURE
@@ -2024,7 +2114,7 @@ svg{ display:block; }
     const RETIRED_ENTRY_TYPES = ["calories", "protein", "water", "sleepHours", "vapingCount", "fastingCompliance"];
 
     function hydrate(){
-      const stored = Storage.get("state", null);
+      const stored = (typeof window.__cloudState !== "undefined") ? window.__cloudState : Storage.get("state", null);
       state = stored ? Object.assign({}, DEFAULT_STATE, stored) : JSON.parse(JSON.stringify(DEFAULT_STATE));
       if (!state.entries) state.entries = {};
       if (!state.weighIns) state.weighIns = [];
@@ -2051,6 +2141,7 @@ svg{ display:block; }
 
     function persist(){
       Storage.set("state", state);
+      if (typeof window.__pushCloudState === "function") window.__pushCloudState(state);
     }
 
     const saveDebounced = Utilities.debounce(persist, 250);
@@ -4460,9 +4551,15 @@ svg{ display:block; }
   };
 
   /* ------------------------------------------------------------------------
-     BOOT
+     BOOT — now gated on Firebase auth + a one-time cloud fetch, instead of
+     booting straight from localStorage. See window.onAuthChange below.
      ------------------------------------------------------------------------ */
-  Utilities.ready(function(){ App.init(); });
+  let appBooted = false;
+  function bootApp(){
+    if (appBooted) return;
+    appBooted = true;
+    Utilities.ready(function(){ App.init(); });
+  }
 
   // Best-effort service worker registration — enables proper Android
   // "Install" (WebAPK) rather than a fragile shortcut, and offline app-shell
@@ -4484,7 +4581,177 @@ svg{ display:block; }
     EntryTypes, Modal, ConfirmDialog, DataEntry, HealthTimeline, WeeklyReviewView,
     StrengthProgram
   };
+  // Bridge for the separate Firebase auth script below — bootApp/appBooted
+  // live in this IIFE's closure and aren't reachable from outside otherwise.
+  window.__49PEAK_BOOT__ = { bootApp: bootApp };
 
+})();
+
+/* ==========================================================================
+   FIREBASE AUTH / CLOUD SYNC — bridges the module-script Firebase instance
+   (window.fb) into the app above. The app's own Data module still writes to
+   localStorage as before (belt-and-suspenders); this layer additionally
+   fetches the cloud copy once at boot and pushes every save to Firestore.
+   ========================================================================== */
+(function(){
+  const loginScreenEl = document.getElementById("loginScreen");
+  const migrationScreenEl = document.getElementById("migrationScreen");
+  const loginFormEl = document.getElementById("loginForm");
+  const loginErrorEl = document.getElementById("loginError");
+  const loginSubmitBtnEl = document.getElementById("loginSubmitBtn");
+
+  function stateDocRef(){ return window.fb.doc(window.fb.db, "fitness", "state"); }
+
+  window.__pushCloudState = function(stateObj){
+    if (!window.fb || !window.fb.auth.currentUser) return;
+    window.fb.setDoc(stateDocRef(), stateObj).catch(function(err){
+      console.warn("[49Peak] cloud save failed:", err && err.message);
+    });
+  };
+
+  function showLogin(){
+    document.getElementById("boot-veil").style.display = "none";
+    migrationScreenEl.style.display = "none";
+    loginScreenEl.style.display = "flex";
+    loginSubmitBtnEl.disabled = false;
+    loginSubmitBtnEl.textContent = "Log in";
+  }
+  function hideLogin(){ loginScreenEl.style.display = "none"; }
+
+  function hasRealLegacyData(legacy){
+    if (!legacy) return false;
+    const entryCount = legacy.entries ? Object.keys(legacy.entries).length : 0;
+    const healthCount = legacy.healthEntries ? Object.keys(legacy.healthEntries).length : 0;
+    return (entryCount + healthCount) > 0;
+  }
+  function readLegacyLocal(){
+    try {
+      const raw = window.localStorage.getItem("49peak:state");
+      return raw ? JSON.parse(raw) : null;
+    } catch(e){ return null; }
+  }
+
+  function showMigrationOffer(legacy){
+    migrationScreenEl.style.display = "flex";
+    const entryCount = legacy.entries ? Object.keys(legacy.entries).length : 0;
+    const healthCount = legacy.healthEntries ? Object.keys(legacy.healthEntries).length : 0;
+    document.getElementById("migrationText").textContent =
+      "Found existing mission data on this device — " + entryCount + " logged day" + (entryCount===1?"":"s") +
+      " and " + healthCount + " health entr" + (healthCount===1?"y":"ies") + ". Move it to the cloud?";
+    document.getElementById("migrationGoBtn").onclick = function(){
+      const btn = this;
+      btn.disabled = true; btn.textContent = "Moving your data…";
+      window.fb.setDoc(stateDocRef(), legacy).then(function(){
+        window.__cloudState = legacy;
+        migrationScreenEl.style.display = "none";
+        window.__49PEAK_BOOT__.bootApp();
+      }).catch(function(err){
+        document.getElementById("migrationError").textContent = "Could not save — check your connection and try again.";
+        btn.disabled = false; btn.textContent = "Move it to the cloud";
+        console.error(err);
+      });
+    };
+    document.getElementById("migrationSkipBtn").onclick = function(){
+      window.__cloudState = null;
+      migrationScreenEl.style.display = "none";
+      window.__49PEAK_BOOT__.bootApp();
+    };
+  }
+
+  window.onAuthChange = async function(user){
+    if (user){
+      hideLogin();
+      window.dispatchEvent(new Event("auth-email-ready"));
+      try{
+        const snap = await window.fb.getDoc(stateDocRef());
+        if (snap.exists()){
+          window.__cloudState = snap.data();
+          window.__49PEAK_BOOT__.bootApp();
+        } else {
+          const legacy = readLegacyLocal();
+          if (hasRealLegacyData(legacy)){
+            document.getElementById("boot-veil").style.display = "none";
+            showMigrationOffer(legacy);
+          } else {
+            window.__cloudState = null;
+            window.__49PEAK_BOOT__.bootApp();
+          }
+        }
+      }catch(err){
+        console.error(err);
+        document.getElementById("boot-veil").style.display = "none";
+        alert("Could not load your data from the cloud — check your connection and reload the page.");
+      }
+    } else {
+      window.__cloudState = undefined;
+      showLogin();
+    }
+  };
+  if (typeof window.__pendingAuthUser !== "undefined"){
+    window.onAuthChange(window.__pendingAuthUser);
+  }
+
+  loginFormEl.addEventListener("submit", function(e){
+    e.preventDefault();
+    loginErrorEl.textContent = "";
+    loginSubmitBtnEl.disabled = true;
+    loginSubmitBtnEl.textContent = "Logging in…";
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value;
+    window.fb.signInWithEmailAndPassword(window.fb.auth, email, password).catch(function(err){
+      loginSubmitBtnEl.disabled = false;
+      loginSubmitBtnEl.textContent = "Log in";
+      const code = (err && err.code) || "unknown-error";
+      const friendly = {
+        "auth/invalid-credential": "Wrong email or password.",
+        "auth/wrong-password": "Wrong password.",
+        "auth/user-not-found": "No account exists for that email.",
+        "auth/invalid-email": "That email address looks incorrectly formatted.",
+        "auth/too-many-requests": "Too many attempts — wait a minute and try again.",
+        "auth/network-request-failed": "No internet connection."
+      }[code] || ("Could not log in (" + code + ").");
+      loginErrorEl.textContent = friendly;
+      console.error(err);
+    });
+  });
+
+  const togglePasswordBtnEl = document.getElementById("togglePassword");
+  const loginPasswordInputEl = document.getElementById("login-password");
+  togglePasswordBtnEl.addEventListener("click", function(){
+    const showing = loginPasswordInputEl.type === "text";
+    loginPasswordInputEl.type = showing ? "password" : "text";
+    togglePasswordBtnEl.textContent = showing ? "SHOW" : "HIDE";
+  });
+
+  // "Signed in as / Log out" — wired independently of the Settings module
+  // so this never risks touching its existing, already-tested code.
+  window.__49PEAK__.Utilities.ready(function(){
+    const dataCard = document.getElementById("data-card");
+    if (!dataCard) return;
+    const accountLabel = document.createElement("div");
+    accountLabel.className = "section-label";
+    accountLabel.textContent = "Account";
+    accountLabel.style.marginTop = "var(--space-5)";
+    const accountCard = document.createElement("div");
+    accountCard.className = "card anim-rise";
+    accountCard.innerHTML =
+      '<p class="page-stub__body" style="margin-bottom:var(--space-3);">Signed in as <strong id="signedInAsEmail" style="color:var(--text);"></strong></p>' +
+      '<button class="btn btn-secondary tappable btn-block" id="logout-btn" type="button" style="width:100%;">Log out</button>';
+    dataCard.insertAdjacentElement("afterend", accountCard);
+    dataCard.insertAdjacentElement("afterend", accountLabel);
+    document.getElementById("logout-btn").addEventListener("click", function(){
+      window.fb.signOut(window.fb.auth).then(function(){
+        location.reload();
+      }).catch(function(){});
+    });
+    if (window.fb && window.fb.auth.currentUser){
+      document.getElementById("signedInAsEmail").textContent = window.fb.auth.currentUser.email;
+    }
+    window.addEventListener("auth-email-ready", function(){
+      const el = document.getElementById("signedInAsEmail");
+      if (el && window.fb.auth.currentUser) el.textContent = window.fb.auth.currentUser.email;
+    });
+  });
 })();
 </script>
 </body>
